@@ -2,18 +2,19 @@
 let valueNames = ["blink","perspective", "mouth", "mouthWidth", "eyeFuzz", "agitation", "speed", "volume", "rainbow", "opacity", "hue"]
 
 let settings = {
-	volume: .5,
+	volume: 1,
 	speed:1,
 	transitionSpeed: .1,
 
 }
 
 let app = {
-	devMode: true,
+	devMode: false,
 	time: {},
 	blackboard: undefined,
 	face: new Face(),
 
+	isActive: false,
 	valueTracker: {},
 	values: {
 	},
@@ -64,19 +65,24 @@ let app = {
 	instance: new Chancery({
 		map:testMimaMap, 
 		metadata:{title:"mima"}, 
-		onOutput: ({output, progress}) => {
-			console.log("OUTPUT", output)
-				
-			app.messages.push({
-				owner: "bot",
-				text: [output]
-			})
-			return app.speakWords(output, progress)	
-		
-		},
-		onChips: (chips) => {
-			console.warn(chips)
-			app.chips = chips
+		handlers: {
+			onEnterState: (stateID, lastStateID) => {
+				console.log("ENTER STATE HANDLER:" + stateID)
+				if (stateID === "welcome")
+					startSoundtrack()
+			},
+			onOutput: ({output, progress}) => {
+					
+				app.messages.push({
+					owner: "bot",
+					text: [output]
+				})
+				return app.speakWords(output, progress)	
+			
+			},
+			onChips: (chips) => {
+				app.chips = chips
+			},
 		},
 		transitionSpeed: settings.transitionSpeed
 	}),
@@ -84,11 +90,7 @@ let app = {
 	messages: [],
 	chips: [],
 	initUI() {
-		// Put the ui in places
-		document.onkeypress = () => {
-			initSounds()
-		}
-
+		
 		new Vue({
 			template: `<div class="main-section" v-if="app.devMode">
 				DEV TOOLS
@@ -112,15 +114,17 @@ let app = {
 	},
 
 	start() {
+		app.isActive = true
+		initSounds()
 		// Clear any existing loop
-		clearInterval(this.tickInterval)
+		clearInterval(app.tickInterval)
 
-		this.instance.start()
+		app.instance.start()
 
 		let blinkCount = 0
 		let tickCount = 0
-		this.tickInterval = setInterval(() => {
-			this.instance.tick()
+		app.tickInterval = setInterval(() => {
+			app.instance.tick()
 			blinkCount++
 			tickCount++
 
@@ -145,10 +149,10 @@ let app = {
 	},
 
 	animateValueTo(name, val, dt) {
-		if (this.valueTracker[name] === undefined)
+		if (app.valueTracker[name] === undefined)
 			console.warn("No value", name)
 
-		this.valueTracker[name].set(val, app.time.current, dt)
+		app.valueTracker[name].set(val, app.time.current, dt)
 	},
 
 
@@ -156,16 +160,17 @@ let app = {
 	init() {
 		
 		valueNames.forEach((name) => {
-			this.valueTracker[name] = new LerpValue()
-			this.values[name] = 0
+			app.valueTracker[name] = new LerpValue()
+			app.values[name] = 0
 		})
 
 
 		
 	
 
-		this.blackboard = this.instance.blackboard
-		this.blackboard.onModify((path, value) => {
+		app.blackboard = app.instance.blackboard
+		app.blackboard.onModify((path, value) => {
+
 			let key = path[0]
 			if (app.valueTracker[key] !== undefined) {
 				app.valueTracker[key].set(value, app.time.current, .5)
@@ -173,42 +178,61 @@ let app = {
 		
 		})
 			
-		
-		utilities.createProcessing({
-			element:"bot", 
-			onUpdate: t => {
-				valueNames.forEach(key => {
-					app.values[key] = app.valueTracker[key].get(t.current)
-					// console.log(key, app.values[key])
-				})
+		function createProcessing() {
+			document.getElementById("bot").innerHTML = '';
 
-				
-				app.face.update(t)
-				
-			}, 
-			onDraw: (g, t) => {
-				
-				if (t.frame <= 1000000) {
-					g.fill(0, 0, 0, .3*(1/(this.values.speed + 1)))
-					g.rect(-g.width/2, -g.height/2, g.width, g.height)
-					app.face.draw(g, t)
+			utilities.createProcessing({
+				element:"bot", 
+				onUpdate: t => {
+					valueNames.forEach(key => {
+						app.values[key] = app.valueTracker[key].get(t.current)
+						// console.log(key, app.values[key])
+					})
+
+					
+					app.face.update(t)
+					
+				}, 
+				onDraw: (g, t) => {
+					
+					if (t.frame <= 1000000) {
+						g.fill(0, 0, 0, .3*(1/(app.values.speed + 1)))
+						g.rect(-g.width/2, -g.height/2, g.width, g.height)
+						app.face.draw(g, t)
+					}
+				}, 
+				onStart: (g, t) => {
+					app.processing = g
+					app.time = t
+
+					console.log("Create processing", g.width, g.height)
+					app.valueTracker.perspective.set(2, t.current, .1)
+					app.valueTracker.opacity.set(10, t.current, .1)
+
+
+
 				}
-			}, 
-			onStart: (g, t) => {
-				app.time = t
+			}); 
+		}
 
-				app.valueTracker.perspective.set(2, t.current, .1)
-				app.valueTracker.opacity.set(10, t.current, .1)
+		window.addEventListener("resize", () => {
+			// TODO: can't get resizing to work
+			// if (app.time.frame > 10) {
+			// 	let botDiv = document.getElementById("bot")
+			// 	console.log(botDiv)
+			// 	console.log("resize", botDiv.clientWidth, botDiv.clientHeight)
 
+			// 	app.processing.size(botDiv.width, botDiv.height);
+			// }
+		});
 
-
-			}
-		}); 
+	
+		createProcessing()
 
 		app.initUI()
 
-		if (!app.devMode)
-			app.start()
+		// if (app.devMode)
+		// 	app.start()
 
 	}
 }
@@ -220,8 +244,14 @@ app.init()
 
 new Vue({
 	template: `
+	<div id="mima-controls">
+		<chat-window v-if="app.isActive" :messages="app.messages" :chips="app.chips" @sendInput='app.userInput' />
+		
+		<div v-else id="start-controls">
+		<button @click="app.start">start</button>
+		</div>
+	</div>
 	
-	<chat-window :messages="app.messages" :chips="app.chips" @sendInput='app.userInput' />
 	`,	
 	el: '#chat',
 	methods: {

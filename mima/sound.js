@@ -1,5 +1,6 @@
 let soundLibrary = {
-	chirps: {}
+	chirps: {},
+	soundtracks: []
 }
 
 
@@ -42,29 +43,47 @@ function randomChirp(length) {
 	if (keys.length !== 0) {
 		let key = getRandom(keys)
 		let sound = soundLibrary.chirps[key]
-		sound.removeEffect(effects.reverb)
+		if (sound.effects.length > 0)
+			sound.removeEffect(effects.reverb)
 
-		sound.volume = app.values.volume
+		sound.volume = app.values.volume*settings.volume
 		if (app.values.perspective > 3) {
-			sound.volume *= .3
+			sound.volume *= .1
 			sound.addEffect(effects.reverb)
 		} else {
-			sound.volume = settings.volume*(.5 + .05*app.values.volume)		
+			 // sound.volume = settings.volume*(.5 + .05*app.values.volume)		
 		}
-
 
 		
 		sound.play()
 	
 		sound.sourceNode.playbackRate.value = (Math.pow(.92, app.values.speed + .01))*settings.speed / (length*.001 + 1 + Math.random())
 		sound.on('end', () => {
-			console.log("done!")
+			// console.log("done!")
 		})
 	}
 }
 
 
+function startSoundtrack() {
+	if (currentSoundtrack === undefined)  {
+		console.log("🎵: start soundtrack")
+		if (soundLibrary.soundtracks.length > 0) {
+			currentSoundtrack = soundLibrary.soundtracks[0]
+			currentSoundtrack.play()
+		} else {
+			playSoundtrackOnLoad = true
+		}
+	} else {
+		console.log("🎵: - soundtrack already playing -")
+		
+	}
+}
+
+let playSoundtrackOnLoad = false
+let currentSoundtrack = undefined
 let soundInitialized = false
+
 function initSounds() {
 	if (!soundInitialized) {
 		soundInitialized = true
@@ -78,11 +97,30 @@ function initSounds() {
 			source: 'file',
 			options: { path: 'mima/sounds/blips/' + name + '.wav' }
 		}, ()  => {
-			console.log('sound file loaded!');
-		//	sound.play();
+			console.log(`blip file loaded: '${name}'`);
+			// console.log('sound file loaded!');
+			//	sound.play();
 			soundLibrary.chirps[name] = sound
 		});
 		
 	})
-}
+
+	// let soundtrackFiles = ["mimamed", "mimamax", "mimamin"]
+	// Just use this for now
+	let soundtrackFiles = ["mimamed"]
+	soundtrackFiles.forEach((name) => {
+		var sound = new Pizzicato.Sound({ 
+			source: 'file',
+			loop: true,
+			options: { path: 'mima/sounds/' + name + '.mp3' }
+		}, ()  => {
+			console.log(`soundtrack file loaded: '${name}'`);
+			//	sound.play();
+			soundLibrary.soundtracks.push(sound)
+			if (playSoundtrackOnLoad)
+				startSoundtrack()
+		});
+		
+	})
+	}
 }
