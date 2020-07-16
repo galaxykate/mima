@@ -1,4 +1,4 @@
-let testMimaMap = {
+let testMimaMap2 = {
 	initialBlackboard: {
 		robe: {name:"#adj.capitalize# #animal.capitalize#",
 		blab: "#gossip#",

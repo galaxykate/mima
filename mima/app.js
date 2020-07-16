@@ -9,7 +9,7 @@ let settings = {
 }
 
 let app = {
-	devMode: false,
+	devMode: true,
 	time: {},
 	blackboard: undefined,
 	face: new Face(),
